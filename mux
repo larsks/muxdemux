@@ -9,6 +9,15 @@ from muxdemux.writer import StreamWriter
 LOG = logging.getLogger('mux')
 
 
+def chunker(fd, blocksize):
+    while True:
+        data = fd.read(blocksize)
+        if not data:
+            break
+
+        yield data
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--blocksize', '-b',
@@ -61,7 +70,7 @@ def main():
         s.add_metadata(k, v)
 
     with (open(args.path) if args.path else sys.stdin) as fd:
-        s.write_iter(fd)
+        s.write_iter(chunker(fd, args.blocksize))
 
     s.finish()
 
