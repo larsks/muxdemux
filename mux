@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+import argparse
+import hashlib
+import logging
+import msgpack
+import sys
+
+LOG = logging.getLogger('mux')
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--blocksize', '-b',
+                   default=1024,
+                   type=int)
+    p.add_argument('--checksum', '-k',
+                   action='store_true')
+
+    p.add_argument('--hash-algorithm', '-H',
+                   default='sha256')
+
+    p.add_argument('--metadata', '-m',
+                   action='append',
+                   type=lambda x: x.split('=', 1))
+
+    p.add_argument('--verbose', '-v',
+                   action='store_const',
+                   dest='loglevel',
+                   const='INFO')
+    p.add_argument('--debug',
+                   action='store_const',
+                   dest='loglevel',
+                   const='DEBUG')
+
+    p.set_defaults(loglevel='WARNING')
+
+    p.add_argument('name', nargs='?')
+
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    logging.basicConfig(level=args.loglevel)
+
+    header = {}
+    metadata = {}
+    if args.checksum:
+        checksum = getattr(hashlib, args.hash_algorithm)()
+        header['hash_algorithm'] = args.hash_algorithm
+    else:
+        checksum = None
+        header['hash_algorithm'] = None
+
+    if args.name:
+        header['name'] = args.name
+
+    if args.metadata:
+        metadata.update(dict(args.metadata))
+
+    msgpack.pack(dict(type='bos', header=header, metadata=metadata), sys.stdout)
+
+    size = 0
+    while True:
+        data = sys.stdin.read(args.blocksize)
+        if not data:
+            break
+        if args.checksum:
+            checksum.update(data)
+        size += len(data)
+        msgpack.pack(dict(type='data', data=data), sys.stdout)
+
+    msgpack.pack(dict(type='eos',
+                      size=size,
+                      checksum=checksum.digest() if checksum else None,
+                      ), sys.stdout)
+
+if __name__ == '__main__':
+    main()

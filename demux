@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+
+import argparse
+import hashlib
+import logging
+import msgpack
+import sys
+
+LOG = logging.getLogger('demux')
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('--output', '-o',
+                   default='stream-%d.out')
+    p.add_argument('--stdout',
+                   action='store_true')
+    p.add_argument('streams',
+                   nargs='*',
+                   type=int)
+    p.add_argument('--list', '-l',
+                   action='store_true')
+    p.add_argument('--verify', '-V',
+                   action='store_true')
+
+    p.add_argument('--verbose', '-v',
+                   action='store_const',
+                   dest='loglevel',
+                   const='INFO')
+    p.add_argument('--debug',
+                   action='store_const',
+                   dest='loglevel',
+                   const='DEBUG')
+
+    p.set_defaults(loglevel='WARNING')
+
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    logging.basicConfig(level=args.loglevel)
+    unpacker = msgpack.Unpacker(sys.stdin)
+
+    stream = 0
+    in_stream = False
+    selected = False
+    header = None
+    checksum = None
+
+    for block in unpacker:
+
+        LOG.debug('%s', block)
+
+        if not in_stream:
+            if block['type'] == 'bos':
+                LOG.debug('found beginning of stream %d: %s', stream, block)
+                header = block['header']
+                if 'name' in ['header']:
+                    LOG.debug('stream name = %s', block['header']['name'])
+                if not args.streams or stream in args.streams:
+                    selected = True
+                    if args.verify and header.get('hash_algorithm'):
+                        checksum = getattr(hashlib,
+                                           header['hash_algorithm'])()
+                    if args.stdout:
+                        LOG.info('sending stream %d to stdout', stream)
+                        outfd = sys.stdout
+                    else:
+                        outname = args.output % stream
+                        LOG.debug('sending stream %d to %s', stream, outname)
+                        outfd = open(outname, 'w')
+
+                bytesread = 0
+                in_stream = True
+            else:
+                raise ValueError('invalid stream')
+        else:
+            if block['type'] == 'eos':
+                LOG.debug('found end of stream %d', stream)
+                LOG.debug('read %d bytes, expected %d bytes',
+                          bytesread, block['size'])
+                if checksum:
+                    LOG.error('%s != %s',
+                              repr(checksum.digest()),
+                              repr(block['checksum']))
+                    if checksum.digest() != block['checksum']:
+                        raise ValueError('stream %d failed verification', stream)
+                if selected and not args.stdout:
+                    outfd.close()
+                stream += 1
+                in_stream = False
+                selected = False
+                checksum = None
+            elif block['type'] == 'data':
+                bytesread += len(block['data'])
+                if checksum:
+                    checksum.update(block['data'])
+                if selected:
+                    outfd.write(block['data'])
+            else:
+                raise ValueError('invalid stream')
+
+
+if __name__ == '__main__':
+    main()
