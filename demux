@@ -3,7 +3,7 @@
 import argparse
 import hashlib
 import logging
-import msgpack
+import cbor
 import sys
 
 LOG = logging.getLogger('demux')
@@ -37,10 +37,18 @@ def parse_args():
     return p.parse_args()
 
 
+def Unpacker(stream):
+    while True:
+        try:
+            yield cbor.load(stream)
+        except EOFError:
+            break
+
+
 def main():
     args = parse_args()
     logging.basicConfig(level=args.loglevel)
-    unpacker = msgpack.Unpacker(sys.stdin)
+    unpacker = Unpacker(sys.stdin)
 
     stream = 0
     in_stream = False

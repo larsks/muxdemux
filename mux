@@ -3,7 +3,7 @@
 import argparse
 import hashlib
 import logging
-import msgpack
+import cbor
 import sys
 
 LOG = logging.getLogger('mux')
@@ -59,7 +59,7 @@ def main():
     if args.metadata:
         metadata.update(dict(args.metadata))
 
-    msgpack.pack(dict(type='bos', header=header, metadata=metadata), sys.stdout)
+    cbor.dump(dict(type='bos', header=header, metadata=metadata), sys.stdout)
 
     size = 0
     while True:
@@ -69,9 +69,9 @@ def main():
         if args.checksum:
             checksum.update(data)
         size += len(data)
-        msgpack.pack(dict(type='data', data=data), sys.stdout)
+        cbor.dump(dict(type='data', data=data), sys.stdout)
 
-    msgpack.pack(dict(type='eos',
+    cbor.dump(dict(type='eos',
                       size=size,
                       checksum=checksum.digest() if checksum else None,
                       ), sys.stdout)
