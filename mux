@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import argparse
-import hashlib
-import logging
-import cbor
 import sys
+import argparse
+import logging
+
+from muxdemux.writer import StreamWriter
 
 LOG = logging.getLogger('mux')
 
@@ -17,12 +17,14 @@ def parse_args():
     p.add_argument('--checksum', '-k',
                    action='store_true')
 
-    p.add_argument('--hash-algorithm', '-H',
-                   default='sha256')
+    p.add_argument('--hashalgo', '-H')
+
+    p.add_argument('--name', '-n')
 
     p.add_argument('--metadata', '-m',
                    action='append',
-                   type=lambda x: x.split('=', 1))
+                   type=lambda x: x.split('=', 1),
+                   default=[])
 
     p.add_argument('--verbose', '-v',
                    action='store_const',
@@ -35,7 +37,7 @@ def parse_args():
 
     p.set_defaults(loglevel='WARNING')
 
-    p.add_argument('name', nargs='?')
+    p.add_argument('path', nargs='?')
 
     return p.parse_args()
 
@@ -44,37 +46,25 @@ def main():
     args = parse_args()
     logging.basicConfig(level=args.loglevel)
 
-    header = {}
-    metadata = {}
-    if args.checksum:
-        checksum = getattr(hashlib, args.hash_algorithm)()
-        header['hash_algorithm'] = args.hash_algorithm
-    else:
-        checksum = None
-        header['hash_algorithm'] = None
-
+    kwargs = {}
     if args.name:
-        header['name'] = args.name
+        kwargs['name'] = args.name
+    elif args.path:
+        kwargs['name'] = args.path
 
-    if args.metadata:
-        metadata.update(dict(args.metadata))
+    if args.checksum:
+        kwargs['writehash'] = True
+        kwargs['hashalgo'] = args.hashalgo
 
-    cbor.dump(dict(type='bos', header=header, metadata=metadata), sys.stdout)
+    s = StreamWriter(sys.stdout, **kwargs)
+    for k, v in args.metadata:
+        s.add_metadata(k, v)
 
-    size = 0
-    while True:
-        data = sys.stdin.read(args.blocksize)
-        if not data:
-            break
-        if args.checksum:
-            checksum.update(data)
-        size += len(data)
-        cbor.dump(dict(type='data', data=data), sys.stdout)
+    with (open(args.path) if args.path else sys.stdin) as fd:
+        s.write_iter(fd)
 
-    cbor.dump(dict(type='eos',
-                      size=size,
-                      checksum=checksum.digest() if checksum else None,
-                      ), sys.stdout)
+    s.finish()
+
 
 if __name__ == '__main__':
     main()
