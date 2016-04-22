@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
+import argparse
+import contextlib
+import errno
+import logging
 import os
 import sys
-import argparse
 import tempfile
-import logging
-import contextlib
 
 from muxdemux.reader import StreamReader, IntegrityError
 
@@ -36,6 +37,8 @@ def parse_args():
                    action='store_true')
     p.add_argument('--continue', '-c',
                    dest='_continue',
+                   action='store_true')
+    p.add_argument('--overwrite', '-f',
                    action='store_true')
 
     p.add_argument('--verbose', '-v',
@@ -122,12 +125,20 @@ def main():
                     for chunk in stream:
                         fd.write(chunk)
 
-                    try:
-                        os.unlink(output_name)
-                    except OSError as err:
-                        pass
+                    if args.overwrite:
+                        try:
+                            os.unlink(output_name)
+                        except OSError as err:
+                            pass
 
-                    os.link(fd.name, output_name)
+                    try:
+                        os.link(fd.name, output_name)
+                    except OSError as err:
+                        if err.errno == errno.EEXIST:
+                            LOG.error('a file named %s already exists '
+                                      '(use --overwrite to replace)',
+                                      output_name)
+                            sys.exit(1)
         except IntegrityError as err:
             if skip or args._continue:
                 LOG.warning('integrity check failed on stream {}: {}'.format(
