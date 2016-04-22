@@ -5,7 +5,7 @@ import argparse
 import logging
 import contextlib
 
-from muxdemux.reader import StreamReader
+from muxdemux.reader import StreamReader, IntegrityError
 
 LOG = logging.getLogger('demux')
 
@@ -31,6 +31,9 @@ def parse_args():
     p.add_argument('--stdout',
                    action='store_true')
     p.add_argument('--list', '-l',
+                   action='store_true')
+    p.add_argument('--continue', '-c',
+                   dest='_continue',
                    action='store_true')
     p.add_argument('--verify', '-V',
                    action='store_true')
@@ -71,19 +74,26 @@ def main():
         else:
             skip = True
 
-        if skip:
-            for chunk in stream:
-                pass
-        else:
-            name = stream.bos.get('name', 'stream%d' % strno)
-            output_name = ('<stdout>' if args.stdout
-                           else args.output_template.format(
-                               strno=strno, name=name))
-
-            LOG.info('processing stream %d to %s', strno, output_name)
-            with output_handler(None if args.stdout else output_name) as fd:
+        try:
+            if skip:
                 for chunk in stream:
-                    fd.write(chunk)
+                    pass
+            else:
+                name = stream.bos.get('name', 'stream%d' % strno)
+                output_name = ('<stdout>' if args.stdout
+                               else args.output_template.format(
+                                   strno=strno, name=name))
+
+                LOG.info('processing stream %d to %s', strno, output_name)
+                with output_handler(None if args.stdout else output_name) as fd:
+                    for chunk in stream:
+                        fd.write(chunk)
+        except IntegrityError as err:
+            if skip or args._continue:
+                LOG.warning('integrity check failed on stream {}: {}'.format(
+                    strno, err))
+            else:
+                raise
 
         if args.list:
             print '[%d]: size=%d, name=%s' % (

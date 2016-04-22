@@ -28,6 +28,10 @@ def cbor_iter(data):
             break
 
 
+def hexify(s):
+    return ''.join('%02x' % ord(x) for x in s)
+
+
 class FileReader(object):
     def __init__(self, bos, fileiter):
         self.bos = bos
@@ -50,13 +54,13 @@ class FileReader(object):
                 self.eos = block
                 if self.ctx is not None:
                     if self.ctx.digest() != self.eos['digest']:
-                        LOG.error('integrity check failed')
-                        raise IntegrityError()
+                        raise IntegrityError('invalid checksum')
                     else:
                         LOG.info('integrity check successful')
                 break
             else:
-                raise InvalidBlock()
+                raise InvalidBlock('expected <data>, <metadata>, or <eos>, '
+                                   'got {blktype}'.format(**block))
 
 
 class StreamReader(object):
@@ -73,4 +77,5 @@ class StreamReader(object):
                 yield FileReader(block, blocks)
                 stream += 1
             else:
-                raise InvalidBlock()
+                raise InvalidBlock('expected <bos>, '
+                                   'got {blktype}'.format(**block))
