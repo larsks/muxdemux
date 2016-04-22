@@ -101,6 +101,12 @@ class StreamWriter(object):
             self.write(chunk)
 
     def finish(self):
+        if self.state == state_bos:
+            self._write_header()
+
+        if self.state == state_metadata:
+            self._write_metadata()
+
         if self.state != state_data:
             raise InvalidState()
 
