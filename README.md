@@ -23,6 +23,17 @@ The `demux` command reads a `mux` stream on `stdin` and by default
 will extract each stream to a file named `stram-<N>.out`, where `<N>`
 is the index of the stream.
 
+## Installation
+
+This project ships with a standard `setup.py` script, so you can:
+
+    git clone https://github.com/larsks/muxdemux.git
+
+And then:
+
+    cd muxdemux
+    pip install .
+
 ## Examples
 
 The following will run `ps -fe`, `ip addr` and `ip route` on the
