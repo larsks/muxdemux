@@ -45,8 +45,7 @@ def parse_args():
                    const='DEBUG')
 
     p.add_argument('streams',
-                   nargs='*',
-                   type=int)
+                   nargs='*')
 
     p.set_defaults(loglevel='WARNING')
 
@@ -61,17 +60,30 @@ def main():
     s = StreamReader(sys.stdin)
 
     for stream in s:
-        if not args.list and (not args.streams or strno in args.streams):
+        if args.list:
+            skip = True
+        elif str(strno) in args.streams:
+            skip = False
+        elif 'name' in stream.bos and stream.bos['name'] in args.streams:
+            skip = False
+        elif not args.streams:
+            skip = False
+        else:
+            skip = True
+
+        if skip:
+            for chunk in stream:
+                pass
+        else:
+            name = stream.bos.get('name', 'stream%d' % strno)
             output_name = ('<stdout>' if args.stdout
-                           else args.output_template.format(strno=strno))
+                           else args.output_template.format(
+                               strno=strno, name=name))
 
             LOG.info('processing stream %d to %s', strno, output_name)
             with output_handler(None if args.stdout else output_name) as fd:
                 for chunk in stream:
                     fd.write(chunk)
-        else:
-            for chunk in stream:
-                pass
 
         if args.list:
             print '[%d]: size=%d, name=%s' % (
