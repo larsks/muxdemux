@@ -13,14 +13,19 @@ class DemuxError(Exception):
 
 
 class InvalidBlock(DemuxError):
+    '''Raised if we find a block with an unknown type or
+    a known type in an unexpected place.'''
     pass
 
 
 class IntegrityError(DemuxError):
+    '''Raised if checksum verification fails.'''
     pass
 
 
 def cbor_iter(data):
+    '''Yields objects from a cbor stream.'''
+
     while True:
         try:
             obj = cbor.load(data)
@@ -29,11 +34,9 @@ def cbor_iter(data):
             break
 
 
-def hexify(s):
-    return ''.join('%02x' % ord(x) for x in s)
-
-
 class FileReader(object):
+    '''Yields data chunks from a single mux part.'''
+
     def __init__(self, bos, fileiter):
         self.bos = bos
         self.fileiter = fileiter
@@ -47,6 +50,7 @@ class FileReader(object):
     def __iter__(self):
         compressed = self.bos.get('compress')
 
+        # Loop until we reach end-of-stream.
         for block in self.fileiter:
             if block['blktype'] == blktype_data:
                 if self.ctx is not None:
@@ -60,6 +64,8 @@ class FileReader(object):
                 self.metadata = block['metadata']
             elif block['blktype'] == blktype_eos:
                 self.eos = block
+
+                # Perform checksum verification
                 if self.ctx is not None:
                     if self.ctx.digest() != self.eos['digest']:
                         raise IntegrityError('invalid checksum')
@@ -72,6 +78,9 @@ class FileReader(object):
 
 
 class StreamReader(object):
+    '''Iterate over parts in a mux stream, yielding FileReader
+    objects.'''
+
     def __init__(self, stream):
         self.stream = stream
 
