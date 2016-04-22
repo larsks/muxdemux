@@ -11,8 +11,8 @@ LOG = logging.getLogger('demux')
 
 
 @contextlib.contextmanager
-def output_handler(filename=None):
-    if not filename or filename == '-':
+def output_handler(filename, use_stdout=False):
+    if use_stdout:
         fd = sys.stdout
     else:
         fd = open(filename, 'w')
@@ -53,17 +53,39 @@ def parse_args():
     return p.parse_args()
 
 
+def consume(stream):
+    '''Consume a stream, returning False if there is an integrity 
+    failure, True otherwise.'''
+
+    try:
+        for chunk in stream:
+            pass
+        return True
+    except IntegrityError:
+        return False
+
+
 def main():
     args = parse_args()
     logging.basicConfig(level=args.loglevel)
+    reader = StreamReader(sys.stdin)
 
-    strno = 0
-    s = StreamReader(sys.stdin)
-
-    for stream in s:
+    for strno, stream in enumerate(reader):
         if args.list:
-            skip = True
-        elif str(strno) in args.streams:
+            valid = consume(stream)
+            print '[%03d]: size=%d, name=%s, hashalgo=%s, valid=%s' % (
+                strno, stream.eos['size'],
+                stream.bos.get('name', '(none)'),
+                stream.bos.get('hashalgo', '(none)'),
+                valid,
+            )
+            if stream.metadata:
+                for k, v in stream.metadata.items():
+                    print '       %s = %s' % (k, v)
+            continue
+
+        # Figure out if we want to write out this stream or not.
+        if str(strno) in args.streams:
             skip = False
         elif 'name' in stream.bos and stream.bos['name'] in args.streams:
             skip = False
@@ -72,20 +94,26 @@ def main():
         else:
             skip = True
 
-        try:
-            if skip:
-                for chunk in stream:
-                    pass
-            else:
-                name = stream.bos.get('name', 'stream%d' % strno)
-                output_name = ('<stdout>' if args.stdout
-                               else args.output_template.format(
-                                   strno=strno, name=name))
+        # If we're skipping the stream, we still need to consume
+        # all the data.
+        if skip:
+            consume(stream)
+            continue
 
-                LOG.info('processing stream %d to %s', strno, output_name)
-                with output_handler(None if args.stdout else output_name) as fd:
-                    for chunk in stream:
-                        fd.write(chunk)
+        name = stream.bos.get('name', 'stream%d' % strno)
+        output_name = ('<stdout>' if args.stdout
+                       else args.output_template.format(
+                           strno=strno, name=name))
+
+        LOG.info('writing stream %d%s to %s',
+                 strno,
+                 (' (name=%s)' % name if name else ''),
+                 output_name)
+
+        try:
+            with output_handler(output_name, args.stdout) as fd:
+                for chunk in stream:
+                    fd.write(chunk)
         except IntegrityError as err:
             if skip or args._continue:
                 LOG.warning('integrity check failed on stream {}: {}'.format(
@@ -93,13 +121,6 @@ def main():
             else:
                 raise
 
-        if args.list:
-            print '[%03d]: size=%d, name=%s' % (
-                strno, stream.eos['size'], stream.bos.get('name', '(none)'))
-            if stream.metadata:
-                for k, v in stream.metadata.items():
-                    print '       %s = %s' % (k, v)
-        strno += 1
 
 if __name__ == '__main__':
     main()
