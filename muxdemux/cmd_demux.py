@@ -58,8 +58,8 @@ def parse_args():
     return p.parse_args()
 
 
-def consume(stream):
-    '''Consume a stream, returning False if there is an integrity 
+def consume(stream, ignore_errors=False):
+    '''Consume a stream, returning False if there is an integrity
     failure, True otherwise.'''
 
     try:
@@ -67,7 +67,8 @@ def consume(stream):
             pass
         return True
     except IntegrityError:
-        return False
+        if not ignore_errors:
+            raise
 
 
 def main():
@@ -77,7 +78,12 @@ def main():
 
     for strno, stream in enumerate(reader):
         if args.list:
-            valid = consume(stream)
+            try:
+                consume(stream)
+                valid = True
+            except IntegrityError:
+                valid = False
+
             print '[%03d]: size=%d, name=%s, hashalgo=%s, ' \
                 'compressed=%s, valid=%s' % (
                     strno, stream.eos['size'],
@@ -85,7 +91,7 @@ def main():
                     stream.bos.get('hashalgo', '(none)'),
                     stream.bos.get('compress', False),
                     valid,
-            )
+                )
             if stream.metadata:
                 for k, v in stream.metadata.items():
                     print '       %s = %s' % (k, v)
@@ -104,7 +110,7 @@ def main():
         # If we're skipping the stream, we still need to consume
         # all the data.
         if skip:
-            consume(stream)
+            consume(stream, ignore_errors=True)
             continue
 
         name = stream.bos.get('name', 'stream%d' % strno)
