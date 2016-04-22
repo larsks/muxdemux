@@ -35,8 +35,6 @@ def parse_args():
     p.add_argument('--continue', '-c',
                    dest='_continue',
                    action='store_true')
-    p.add_argument('--verify', '-V',
-                   action='store_true')
 
     p.add_argument('--verbose', '-v',
                    action='store_const',
