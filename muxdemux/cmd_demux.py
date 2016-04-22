@@ -94,8 +94,11 @@ def main():
                 raise
 
         if args.list:
-            print '[%d]: size=%d, name=%s' % (
+            print '[%03d]: size=%d, name=%s' % (
                 strno, stream.eos['size'], stream.bos.get('name', '(none)'))
+            if stream.metadata:
+                for k, v in stream.metadata.items():
+                    print '       %s = %s' % (k, v)
         strno += 1
 
 if __name__ == '__main__':

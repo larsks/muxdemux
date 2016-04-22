@@ -36,7 +36,8 @@ class FileReader(object):
     def __init__(self, bos, fileiter):
         self.bos = bos
         self.fileiter = fileiter
-        self.eos = None
+        self.eos = {}
+        self.metadata = {}
         self.ctx = None
 
         if 'hashalgo' in bos:
