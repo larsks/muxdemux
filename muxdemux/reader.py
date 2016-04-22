@@ -1,6 +1,7 @@
 import cbor
 import hashlib
 import logging
+import zlib
 
 from .common import *  # NOQA
 
@@ -44,11 +45,17 @@ class FileReader(object):
             self.ctx = getattr(hashlib, bos['hashalgo'])()
 
     def __iter__(self):
+        compressed = self.bos.get('compress')
+
         for block in self.fileiter:
             if block['blktype'] == blktype_data:
                 if self.ctx is not None:
                     self.ctx.update(block['data'])
-                yield block['data']
+
+                if compressed:
+                    yield zlib.decompress(block['data'])
+                else:
+                    yield block['data']
             elif block['blktype'] == blktype_metadata:
                 self.metadata = block['metadata']
             elif block['blktype'] == blktype_eos:

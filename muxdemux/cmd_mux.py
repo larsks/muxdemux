@@ -25,9 +25,10 @@ def parse_args():
                    type=int)
     p.add_argument('--checksum', '-k',
                    action='store_true')
+    p.add_argument('--compress', '-z',
+                   action='store_true')
 
     p.add_argument('--hashalgo', '-H')
-
     p.add_argument('--name', '-n')
 
     p.add_argument('--metadata', '-m',
@@ -65,14 +66,17 @@ def main():
         kwargs['writehash'] = True
         kwargs['hashalgo'] = args.hashalgo
 
-    s = StreamWriter(sys.stdout, **kwargs)
+    if args.compress:
+        kwargs['compress'] = True
+
+    writer = StreamWriter(sys.stdout, **kwargs)
     for k, v in args.metadata:
-        s.add_metadata(k, v)
+        writer.add_metadata(k, v)
 
     with (open(args.path) if args.path else sys.stdin) as fd:
-        s.write_iter(chunker(fd, args.blocksize))
+        writer.write_iter(chunker(fd, args.blocksize))
 
-    s.finish()
+    writer.finish()
 
 
 if __name__ == '__main__':

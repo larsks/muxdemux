@@ -78,11 +78,13 @@ def main():
     for strno, stream in enumerate(reader):
         if args.list:
             valid = consume(stream)
-            print '[%03d]: size=%d, name=%s, hashalgo=%s, valid=%s' % (
-                strno, stream.eos['size'],
-                stream.bos.get('name', '(none)'),
-                stream.bos.get('hashalgo', '(none)'),
-                valid,
+            print '[%03d]: size=%d, name=%s, hashalgo=%s, ' \
+                'compressed=%s, valid=%s' % (
+                    strno, stream.eos['size'],
+                    stream.bos.get('name', '(none)'),
+                    stream.bos.get('hashalgo', '(none)'),
+                    stream.bos.get('compress', False),
+                    valid,
             )
             if stream.metadata:
                 for k, v in stream.metadata.items():

@@ -1,6 +1,7 @@
 import cbor
 import hashlib
 import logging
+import zlib
 
 from .common import *  # NOQA
 
@@ -25,11 +26,13 @@ class InvalidState(MuxError):
 
 class StreamWriter(object):
     def __init__(self, stream,
-                 name=None, hashalgo=None, writehash=False):
+                 name=None, hashalgo=None, writehash=False,
+                 compress=False):
         self.stream = stream
         self.name = name
         self.hashalgo = hashalgo if hashalgo else default_hashalgo
         self.writehash = writehash
+        self.compress = compress
         self.state = state_bos
         self.metadata = {}
         self.byteswritten = 0
@@ -46,6 +49,8 @@ class StreamWriter(object):
             header['name'] = self.name
         if self.writehash:
             header['hashalgo'] = self.hashalgo
+        if self.compress:
+            header['compress'] = True
 
         self._write_block(blktype_bos, **header)
         self.state = state_metadata
@@ -81,6 +86,9 @@ class StreamWriter(object):
 
         if self.state != state_data:
             raise InvalidState()
+
+        if self.compress:
+            data = zlib.compress(data)
 
         if self.writehash:
             self.ctx.update(data)
