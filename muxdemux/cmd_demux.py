@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import argparse
+import tempfile
 import logging
 import contextlib
 
@@ -111,15 +113,29 @@ def main():
                  output_name)
 
         try:
-            with output_handler(output_name, args.stdout) as fd:
+            if args.stdout:
                 for chunk in stream:
-                    fd.write(chunk)
+                    sys.stdout.write(chunk)
+            else:
+                with tempfile.NamedTemporaryFile(
+                        dir=os.path.dirname(output_name)) as fd:
+                    for chunk in stream:
+                        fd.write(chunk)
+
+                    try:
+                        os.unlink(output_name)
+                    except OSError as err:
+                        pass
+
+                    os.link(fd.name, output_name)
         except IntegrityError as err:
             if skip or args._continue:
                 LOG.warning('integrity check failed on stream {}: {}'.format(
                     strno, err))
             else:
-                raise
+                LOG.error('integrity check failed on stream {}: {}'.format(
+                    strno, err))
+                sys.exit(1)
 
 
 if __name__ == '__main__':
