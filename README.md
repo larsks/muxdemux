@@ -4,8 +4,9 @@ This project consists of two commands, `mux` and `demux`.
 
 ## Mux
 
-    usage: mux [-h] [--blocksize BLOCKSIZE] [--checksum] [--hashalgo HASHALGO]
-               [--name NAME] [--metadata METADATA] [--verbose] [--debug]
+    usage: mux [-h] [--blocksize BLOCKSIZE] [--checksum] [--compress]
+               [--hashalgo HASHALGO] [--name NAME] [--metadata METADATA]
+               [--verbose] [--debug]
                [path]
 
 The `mux` commands reads from `stdin` or from a single optional path,
@@ -15,7 +16,7 @@ and produces a `mux` stream on `stdout`.  You can concatenate multiple
 ## Demux
 
     usage: demux [-h] [--output-template OUTPUT_TEMPLATE] [--stdout] [--list]
-                 [--verify] [--verbose] [--debug]
+                 [--continue] [--overwrite] [--verbose] [--debug]
                  [streams [streams ...]]
 
 
